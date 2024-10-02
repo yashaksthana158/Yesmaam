@@ -9,6 +9,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.db.models import Q  # Import Q for complex queries
 from django.contrib.auth import login, authenticate,logout
 from django.core.mail import send_mail
+from django.shortcuts import get_object_or_404
 
 import qrcode
 from io import BytesIO
