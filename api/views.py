@@ -319,7 +319,7 @@ class TeacherClassesView(APIView):
 
         return Response({"classes": class_data}, status=status.HTTP_200_OK)
     
-class ClassPeopleView(APIView):
+""" class ClassPeopleView(APIView):
     def get(self, request, class_code):
         # Retrieve the class by class_code
         class_obj = get_object_or_404(Class, class_code=class_code)
@@ -339,7 +339,34 @@ class ClassPeopleView(APIView):
             ]
         }
         
+        return Response(data, status=status.HTTP_200_OK) """
+
+class ClassPeopleView(APIView):
+    def get(self, request, class_code):
+        class_obj = get_object_or_404(Class, class_code=class_code)
+        
+        # Prepare response in the format expected by the Flutter frontend
+        people = []
+        
+        # Add teacher as the first person in the list
+        people.append({
+            'name': class_obj.teacher.name,
+            'role': 'Teacher',
+        })
+        
+        # Add students to the list
+        for student in class_obj.students.all():
+            people.append({
+                'name': student.name,
+                'role': 'Student',
+            })
+
+        data = {
+            'people': people
+        }
+        
         return Response(data, status=status.HTTP_200_OK)
+
     
 #All the classes a student has join 
 class StudentClassesView(APIView):
