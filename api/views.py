@@ -233,6 +233,7 @@ class GenerateQRCodeView(APIView):
 
 
 class MarkAttendanceView(APIView):
+    @csrf_exempt
     def post(self, request):
         qr_data = request.data.get("qr_data")
         
@@ -240,6 +241,7 @@ class MarkAttendanceView(APIView):
         try:
             class_code, scanned_date = qr_data.split('|')
             current_class = Class.objects.get(class_code=class_code)
+            print(request.data)
             student = Student.objects.get(email=request.session['email'])
             
             # Mark attendance for the student on the given date
