@@ -318,7 +318,27 @@ class TeacherClassesView(APIView):
 
         return Response({"classes": class_data}, status=status.HTTP_200_OK)
     
-
+class ClassPeopleView(APIView):
+    def get(self, request, class_code):
+        # Retrieve the class by class_code
+        class_obj = get_object_or_404(Class, class_code=class_code)
+        
+        # Prepare the response data
+        data = {
+            'class_name': class_obj.class_name,
+            'teacher': {
+                'name': class_obj.teacher.name,
+                'email': class_obj.teacher.email,
+            },
+            'students': [
+                {
+                    'name': student.name,
+                    'email': student.email,
+                } for student in class_obj.students.all()
+            ]
+        }
+        
+        return Response(data, status=status.HTTP_200_OK)
     
 #All the classes a student has join 
 class StudentClassesView(APIView):

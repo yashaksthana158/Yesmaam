@@ -32,5 +32,6 @@ urlpatterns = [
     path('student/classes/', views.StudentClassesView.as_view(), name='student-classes'),
     path('password-reset-request/', views.PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset/', views.PasswordResetView.as_view(), name='confirm_password'),
+    path('class/<str:class_code>/people/', views.ClassPeopleView.as_view(), name='class_people_api'),
     path('logout/',views.LogoutView.as_view(), name='logout'),
 ]
