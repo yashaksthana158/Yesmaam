@@ -241,7 +241,7 @@ class MarkAttendanceView(APIView):
         try:
             class_code, scanned_date = qr_data.split('|')
             current_class = Class.objects.get(class_code=class_code)
-            print(request.session.data)
+            print(request.session['email'])
             student = Student.objects.get(email=request.session['email'])
             
             # Mark attendance for the student on the given date
