@@ -416,11 +416,11 @@ class AttendanceListView(APIView):
                 
                 data = {
                     "class_name": current_class.class_name,
-                    "students_attendance": [
-                        {"student_name": record.student.name, "date": record.date, "status": record.status}
+                    "attendance": [
+                        {"date": record.date, "status": record.status}
                         for record in attendance_records
-                    ]
-                }
+                    ] if attendance_records.exists() else []
+                            }
                 return Response(data, status=status.HTTP_200_OK)
             
             else:
