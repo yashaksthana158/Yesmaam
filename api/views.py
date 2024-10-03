@@ -15,6 +15,8 @@ import qrcode
 from io import BytesIO
 from django.http import HttpResponse
 from datetime import date
+import pandas as pd
+from reportlab.pdfgen import canvas
 
 
 class RegisterUser(APIView):
@@ -151,7 +153,6 @@ class PasswordResetView(APIView):
 
 class CreateClassView(APIView):
 
-    @csrf_exempt
     def post(self, request):
         # Retrieve the role and email from the session
         user_role = request.session.get('role')
@@ -330,27 +331,7 @@ class TeacherClassesView(APIView):
 
         return Response({"classes": class_data}, status=status.HTTP_200_OK)
     
-""" class ClassPeopleView(APIView):
-    def get(self, request, class_code):
-        # Retrieve the class by class_code
-        class_obj = get_object_or_404(Class, class_code=class_code)
-        
-        # Prepare the response data
-        data = {
-            'class_name': class_obj.class_name,
-            'teacher': {
-                'name': class_obj.teacher.name,
-                'email': class_obj.teacher.email,
-            },
-            'students': [
-                {
-                    'name': student.name,
-                    'email': student.email,
-                } for student in class_obj.students.all()
-            ]
-        }
-        
-        return Response(data, status=status.HTTP_200_OK) """
+
 
 class ClassPeopleView(APIView):
     def get(self, request, class_code):
@@ -397,6 +378,123 @@ class StudentClassesView(APIView):
         class_data = [{"class_name": c.class_name, "class_code": c.class_code} for c in classes]
 
         return Response({"classes": class_data}, status=status.HTTP_200_OK)
+    
+
+
+
+class AttendanceListView(APIView):
+    def get(self, request, class_code):
+        role = request.session.get('role')
+        email = request.session.get('email')
+        
+        try:
+            current_class = Class.objects.get(class_code=class_code)
+            
+            if role == 'student':
+                # Get the student and their last 15 attendance entries
+                student = Student.objects.get(email=email)
+                attendance_records = Attendance.objects.filter(student=student, class_attended=current_class).order_by('-date')[:15]
+                
+                data = {
+                    "class_name": current_class.class_name,
+                    "attendance": [
+                        {"date": record.date, "status": record.status}
+                        for record in attendance_records
+                    ]
+                }
+                return Response(data, status=status.HTTP_200_OK)
+            
+            elif role == 'teacher':
+                today = date.today()
+                qr_generated = True  # Assuming this flag is handled elsewhere for QR code generation
+                
+                if qr_generated:
+                    attendance_records = Attendance.objects.filter(class_attended=current_class, date=today)
+                else:
+                    # Get the latest entry (last date's attendance)
+                    attendance_records = Attendance.objects.filter(class_attended=current_class).order_by('-date')[:1]
+                
+                data = {
+                    "class_name": current_class.class_name,
+                    "students_attendance": [
+                        {"student_name": record.student.name, "date": record.date, "status": record.status}
+                        for record in attendance_records
+                    ]
+                }
+                return Response(data, status=status.HTTP_200_OK)
+            
+            else:
+                return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
+        
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ExportAttendanceView(APIView):
+    def get(self, request, class_code, format_type):
+        role = request.session.get('role')
+        email = request.session.get('email')
+        
+        try:
+            current_class = Class.objects.get(class_code=class_code)
+            
+            if role == 'student':
+                student = Student.objects.get(email=email)
+                attendance_records = Attendance.objects.filter(student=student, class_attended=current_class)
+            elif role == 'teacher':
+                attendance_records = Attendance.objects.filter(class_attended=current_class)
+            else:
+                return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
+            
+            # Prepare data for export
+            attendance_data = [
+                {"Student Name": record.student.name, "Date": record.date, "Status": record.status}
+                for record in attendance_records
+            ]
+
+            if format_type == 'xlsx':
+                return self.export_xlsx(attendance_data)
+            elif format_type == 'pdf':
+                return self.export_pdf(attendance_data)
+            else:
+                return Response({"error": "Invalid format"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def export_xlsx(self, attendance_data):
+        df = pd.DataFrame(attendance_data)
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='Attendance', index=False)
+        
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename=attendance.xlsx'
+        return response
+
+    def export_pdf(self, attendance_data):
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer)
+        p.drawString(100, 800, "Attendance Records")
+        
+        y_position = 750
+        for record in attendance_data:
+            p.drawString(100, y_position, f"Student Name: {record['Student Name']}, Date: {record['Date']}, Status: {record['Status']}")
+            y_position -= 20
+        
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename=attendance.pdf'
+        return response
+
 
 
 

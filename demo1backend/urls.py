@@ -33,5 +33,14 @@ urlpatterns = [
     path('password-reset-request/', views.PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset/', views.PasswordResetView.as_view(), name='confirm_password'),
     path('class/<str:class_code>/people/', views.ClassPeopleView.as_view(), name='class_people_api'),
+     # URL for loading attendance data (for students and teachers)
+    path('attendance/<str:class_code>/', views.AttendanceListView.as_view(), name='attendance_list'),
+
+    # URL for exporting attendance data as XLSX
+    path('attendance/<str:class_code>/export/xlsx/', views.ExportAttendanceView.as_view(), {'format_type': 'xlsx'}, name='export_attendance_xlsx'),
+
+    # URL for exporting attendance data as PDF
+    path('attendance/<str:class_code>/export/pdf/', views.ExportAttendanceView.as_view(), {'format_type': 'pdf'}, name='export_attendance_pdf'),
+
     path('logout/',views.LogoutView.as_view(), name='logout'),
 ]
