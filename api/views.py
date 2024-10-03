@@ -417,7 +417,7 @@ class AttendanceListView(APIView):
                 data = {
                     "class_name": current_class.class_name,
                     "attendance": [
-                        {"date": record.date, "status": record.status}
+                        {"student_name": record.student.name, "status": record.status}
                         for record in attendance_records
                     ] if attendance_records.exists() else []
                             }
