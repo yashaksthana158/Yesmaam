@@ -235,13 +235,22 @@ class GenerateQRCodeView(APIView):
 class MarkAttendanceView(APIView):
     @csrf_exempt
     def post(self, request):
+        print(request.session.keys())  # To see what session keys are available
+        print(request.session.get('email'))  # To debug the email retrieval
+
         qr_data = request.data.get("qr_data")
+        if 'email' not in request.session:
+            return Response({"error": "Session email not found"}, status=status.HTTP_401_UNAUTHORIZED)
+
         
         # Assuming qr_data comes in format "class_id|date"
         try:
             class_code, scanned_date = qr_data.split('|')
+
+            scanned_date = date.fromisoformat(scanned_date)
+
             current_class = Class.objects.get(class_code=class_code)
-            print(request.session['email'])
+           
             student = Student.objects.get(email=request.session['email'])
             
             # Mark attendance for the student on the given date
