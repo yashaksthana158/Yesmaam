@@ -381,7 +381,7 @@ class StudentClassesView(APIView):
     
 
 
-
+""" 
 class AttendanceListView(APIView):
     def get(self, request, class_code):
         role = request.session.get('role')
@@ -430,6 +430,84 @@ class AttendanceListView(APIView):
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+ """
+
+
+class AttendanceListView(APIView):
+    class AttendancePagination(PageNumberPagination):
+        page_size = 10  # You can set the number of records per page here
+        page_size_query_param = 'page_size'  # Optional: Allow the client to set the page size
+        max_page_size = 100  # Optional: Limit the maximum page size
+
+    def get(self, request, class_code):
+        role = request.session.get('role')
+        email = request.session.get('email')
+
+        # Optional date parameters for teachers to filter by specific date or range
+        specific_date = request.query_params.get('date')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        try:
+            current_class = Class.objects.get(class_code=class_code)
+
+            if role == 'student':
+                # Get the student and their last 15 attendance entries
+                student = Student.objects.get(email=email)
+                attendance_records = Attendance.objects.filter(student=student, class_attended=current_class).order_by('-date')
+
+                # Paginate the attendance records
+                paginator = self.AttendancePagination()
+                paginated_records = paginator.paginate_queryset(attendance_records, request)
+
+                data = {
+                    "class_name": current_class.class_name,
+                    "attendance": [
+                        {"date": record.date, "status": record.status}
+                        for record in paginated_records
+                    ]
+                }
+
+                # Return paginated response
+                return paginator.get_paginated_response(data)
+
+            elif role == 'teacher':
+                if specific_date:
+                    attendance_records = Attendance.objects.filter(class_attended=current_class, date=specific_date)
+                elif start_date and end_date:
+                    attendance_records = Attendance.objects.filter(class_attended=current_class, date__range=[start_date, end_date])
+                else:
+                    today = date.today()
+                    qr_generated = True
+                    if qr_generated:
+                        attendance_records = Attendance.objects.filter(class_attended=current_class, date=today)
+                    else:
+                        last_attendance_date = Attendance.objects.filter(class_attended=current_class).exclude(date=today).aggregate(Max('date'))['date__max']
+                        attendance_records = Attendance.objects.filter(class_attended=current_class, date=last_attendance_date)
+
+                # Paginate the attendance records
+                paginator = self.AttendancePagination()
+                paginated_records = paginator.paginate_queryset(attendance_records, request)
+
+                data = {
+                    "class_name": current_class.class_name,
+                    "attendance": [
+                        {"student_name": record.student.name, "status": record.status, "date": record.date}
+                        for record in paginated_records
+                    ] if attendance_records.exists() else []
+                }
+
+                # Return paginated response
+                return paginator.get_paginated_response(data)
+
+            else:
+                return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
+
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
 
 
 class ExportAttendanceView(APIView):
