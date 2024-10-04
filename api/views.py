@@ -10,6 +10,9 @@ from django.db.models import Q  # Import Q for complex queries
 from django.contrib.auth import login, authenticate,logout
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
+from django.db.models import Max, Q
+
 
 import qrcode
 from io import BytesIO
