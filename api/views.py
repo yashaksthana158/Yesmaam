@@ -436,8 +436,6 @@ class AttendanceListView(APIView):
  """
 
 
-
-
 class AttendanceListView(APIView):
     class AttendancePagination(PageNumberPagination):
         page_size = 10
@@ -448,18 +446,23 @@ class AttendanceListView(APIView):
         role = request.session.get('role')
         email = request.session.get('email')
 
-        # Optional date parameters for teachers to filter by specific date or range
+        # Optional date parameters for filtering by date or range
         specific_date = request.query_params.get('date')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
 
         try:
+            # Fetch class based on the provided class code
             current_class = Class.objects.get(class_code=class_code)
 
+            # If the role is student, fetch attendance for that specific student
             if role == 'student':
                 student = Student.objects.get(email=email)
-                # Explicitly order the queryset by date
-                attendance_records = Attendance.objects.filter(student=student, class_attended=current_class).order_by('-date')
+                # Get attendance records for the student in the given class
+                attendance_records = Attendance.objects.filter(
+                    student=student, 
+                    class_attended=current_class
+                ).order_by('-date')
 
                 paginator = self.AttendancePagination()
                 paginated_records = paginator.paginate_queryset(attendance_records, request)
@@ -471,29 +474,30 @@ class AttendanceListView(APIView):
                         for record in paginated_records
                     ]
                 }
-
                 return paginator.get_paginated_response(data)
 
+            # If the role is teacher, fetch attendance for the entire class
             elif role == 'teacher':
                 if specific_date:
-                    attendance_records = Attendance.objects.filter(class_attended=current_class, date=specific_date).order_by('date')
+                    attendance_records = Attendance.objects.filter(
+                        class_attended=current_class, date=specific_date
+                    ).order_by('date')
                 elif start_date and end_date:
                     attendance_records = Attendance.objects.filter(
                         class_attended=current_class, 
                         date__range=[start_date, end_date]
                     ).order_by('date')
                 else:
+                    # Fetch today's attendance records by default
                     today = date.today()
-                    qr_generated = True
-                    if qr_generated:
-                        attendance_records = Attendance.objects.filter(class_attended=current_class, date=today).order_by('date')
-                    else:
-                        last_attendance_date = Attendance.objects.filter(class_attended=current_class).exclude(date=today).aggregate(Max('date'))['date__max']
-                        attendance_records = Attendance.objects.filter(class_attended=current_class, date=last_attendance_date).order_by('date')
+                    attendance_records = Attendance.objects.filter(
+                        class_attended=current_class, date=today
+                    ).order_by('date')
 
                 paginator = self.AttendancePagination()
                 paginated_records = paginator.paginate_queryset(attendance_records, request)
 
+                # Prepare the data to be returned
                 data = {
                     "class_name": current_class.class_name,
                     "attendance": [
@@ -511,6 +515,7 @@ class AttendanceListView(APIView):
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
 
 
 
