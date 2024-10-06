@@ -436,12 +436,13 @@ class AttendanceListView(APIView):
  """
 
 
-class AttendanceListView(APIView):
-    class AttendancePagination(PageNumberPagination):
-        page_size = 10
-        page_size_query_param = 'page_size'
-        max_page_size = 100
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import date
+from .models import Class, Student, Attendance
 
+class AttendanceListView(APIView):
     def get(self, request, class_code):
         role = request.session.get('role')
         email = request.session.get('email')
@@ -457,24 +458,25 @@ class AttendanceListView(APIView):
 
             # If the role is student, fetch attendance for that specific student
             if role == 'student':
-                student = Student.objects.get(email=email)
+                try:
+                    student = Student.objects.get(email=email)
+                except Student.DoesNotExist:
+                    return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
                 # Get attendance records for the student in the given class
                 attendance_records = Attendance.objects.filter(
                     student=student, 
                     class_attended=current_class
                 ).order_by('-date')
 
-                paginator = self.AttendancePagination()
-                paginated_records = paginator.paginate_queryset(attendance_records, request)
-
                 data = {
                     "class_name": current_class.class_name,
                     "attendance": [
                         {"date": record.date, "status": record.status}
-                        for record in paginated_records
+                        for record in attendance_records
                     ]
                 }
-                return paginator.get_paginated_response(data)
+                return Response(data, status=status.HTTP_200_OK)
 
             # If the role is teacher, fetch attendance for the entire class
             elif role == 'teacher':
@@ -494,27 +496,23 @@ class AttendanceListView(APIView):
                         class_attended=current_class, date=today
                     ).order_by('date')
 
-                paginator = self.AttendancePagination()
-                paginated_records = paginator.paginate_queryset(attendance_records, request)
-
                 # Prepare the data to be returned
                 data = {
                     "class_name": current_class.class_name,
                     "attendance": [
                         {"student_name": record.student.name, "status": record.status, "date": record.date}
-                        for record in paginated_records
-                    ] if attendance_records.exists() else []
+                        for record in attendance_records
+                    ]
                 }
-
-                return paginator.get_paginated_response(data)
+                return Response(data, status=status.HTTP_200_OK)
 
             else:
                 return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
 
         except Class.DoesNotExist:
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Student.DoesNotExist:
-            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Attendance.DoesNotExist:
+            return Response({"error": "Attendance records not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 
