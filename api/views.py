@@ -384,7 +384,7 @@ class StudentClassesView(APIView):
     
 
 
-""" 
+
 class AttendanceListView(APIView):
     def get(self, request, class_code):
         role = request.session.get('role')
@@ -433,10 +433,10 @@ class AttendanceListView(APIView):
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
         except Student.DoesNotExist:
             return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
- """
 
 
-from rest_framework.views import APIView
+
+""" from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import date
@@ -512,7 +512,7 @@ class AttendanceListView(APIView):
         except Class.DoesNotExist:
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
         except Attendance.DoesNotExist:
-            return Response({"error": "Attendance records not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Attendance records not found"}, status=status.HTTP_404_NOT_FOUND) """
 
 
 
