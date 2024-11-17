@@ -217,31 +217,22 @@ class JoinClassView(APIView):
 
 
 
-from django.utils.timezone import now
-
-
 class GenerateQRCodeView(APIView):
     def get(self, request, class_code):
         try:
             current_class = Class.objects.get(class_code=class_code)
             
-            # Data to be encoded in QR (class_code|current date and time)
-            current_time = now().strftime("%Y-%m-%d %H:%M:%S")
-            qr_data = f"{current_class.class_code}|{current_time}"
+            # Data to be encoded in QR (class_id|date)
+            qr_data = f"{current_class.class_code}|{str(date.today())}"
             qr = qrcode.make(qr_data)
             buffer = BytesIO()
             qr.save(buffer)
             buffer.seek(0)
             
-            # Return the QR code as a PNG image
-            response = HttpResponse(buffer, content_type="image/png")
-            buffer.close()  # Ensure buffer is closed after usage
-            return response
+            # Returning the QR code as a PNG image
+            return HttpResponse(buffer, content_type="image/png")
         except Class.DoesNotExist:
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 
