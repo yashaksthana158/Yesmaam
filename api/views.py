@@ -12,6 +12,7 @@ from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Max, Q
+from openpyxl import Workbook
 
 
 import qrcode
@@ -216,22 +217,31 @@ class JoinClassView(APIView):
 
 
 
+from django.utils.timezone import now
+
+
 class GenerateQRCodeView(APIView):
     def get(self, request, class_code):
         try:
             current_class = Class.objects.get(class_code=class_code)
             
-            # Data to be encoded in QR (class_id|date)
-            qr_data = f"{current_class.class_code}|{str(date.today())}"
+            # Data to be encoded in QR (class_code|current date and time)
+            current_time = now().strftime("%Y-%m-%d %H:%M:%S")
+            qr_data = f"{current_class.class_code}|{current_time}"
             qr = qrcode.make(qr_data)
             buffer = BytesIO()
             qr.save(buffer)
             buffer.seek(0)
             
-            # Returning the QR code as a PNG image
-            return HttpResponse(buffer, content_type="image/png")
+            # Return the QR code as a PNG image
+            response = HttpResponse(buffer, content_type="image/png")
+            buffer.close()  # Ensure buffer is closed after usage
+            return response
         except Class.DoesNotExist:
             return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 
@@ -409,12 +419,12 @@ class AttendanceListView(APIView):
             
             elif role == 'teacher':
                 today = date.today()
-                qr_generated = True  # Assuming this flag is handled elsewhere for QR code generation
                 
-                if qr_generated:
-                    attendance_records = Attendance.objects.filter(class_attended=current_class, date=today)
-                else:
-                    # Get the latest entry (last date's attendance)
+                # Fetch today's attendance first
+                attendance_records = Attendance.objects.filter(class_attended=current_class, date=today)
+
+                # If no attendance records are found for today, fetch the latest attendance entry
+                if not attendance_records.exists():
                     attendance_records = Attendance.objects.filter(class_attended=current_class).order_by('-date')[:1]
                 
                 data = {
@@ -423,9 +433,9 @@ class AttendanceListView(APIView):
                         {"student_name": record.student.name, "status": record.status}
                         for record in attendance_records
                     ] if attendance_records.exists() else []
-                            }
+                }
                 return Response(data, status=status.HTTP_200_OK)
-            
+             
             else:
                 return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
         
@@ -436,11 +446,7 @@ class AttendanceListView(APIView):
 
 
 
-""" from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from datetime import date
-from .models import Class, Student, Attendance
+""" 
 
 class AttendanceListView(APIView):
     def get(self, request, class_code):
@@ -516,7 +522,7 @@ class AttendanceListView(APIView):
 
 
 
-
+""" 
 class ExportAttendanceView(APIView):
     def get(self, request, class_code, format_type):
         role = request.session.get('role')
@@ -579,9 +585,88 @@ class ExportAttendanceView(APIView):
         response = HttpResponse(buffer, content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename=attendance.pdf'
         return response
+ """
 
 
 
+class TeacherFilterView(APIView):
+    def get(self, request, class_code):
+        role = request.session.get('role')
+
+        # Optional date parameter for filtering by date
+        specific_date = request.query_params.get('date')
+
+        try:
+            # Fetch class based on the provided class code
+            current_class = Class.objects.get(class_code=class_code)
+
+            # If the role is teacher, fetch attendance for the entire class
+            if role == 'teacher':
+                if specific_date:
+                    attendance_records = Attendance.objects.filter(
+                        class_attended=current_class, date=specific_date
+                    ).order_by('date')
+                else:
+                    # Fetch today's attendance records by default
+                    today = date.today()
+                    attendance_records = Attendance.objects.filter(
+                        class_attended=current_class, date=today
+                    ).order_by('date')
+
+                # Prepare the data to be returned
+                data = {
+                    "class_name": current_class.class_name,
+                    "attendance": [
+                        {"student_name": record.student.name, "status": record.status, "date": record.date}
+                        for record in attendance_records
+                    ]
+                }
+                return Response(data, status=status.HTTP_200_OK)
+
+            else:
+                return Response({"error": "Invalid role"}, status=status.HTTP_403_FORBIDDEN)
+
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Attendance.DoesNotExist:
+            return Response({"error": "Attendance records not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ExportAttendanceXLSX(APIView):
+    def get(self, request, class_code):
+        # Fetch attendance data
+        attendance_records = Attendance.objects.filter(class_attended__class_code=class_code)
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.append(['Student Name', 'Status', 'Date'])
+        
+        for record in attendance_records:
+            ws.append([record.student.name, record.status, record.date.strftime('%Y-%m-%d')])
+        
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename=attendance_{class_code}.xlsx'
+        wb.save(response)
+        return response
+    
+class ExportAttendancePDF(APIView):
+    def get(self, request, class_code):
+        # Fetch attendance data
+        attendance_records = Attendance.objects.filter(class_attended__class_code=class_code)
+        
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename=attendance_{class_code}.pdf'
+        
+        p = canvas.Canvas(response)
+        p.drawString(100, 800, f"Attendance for Class {class_code}")
+        y = 750
+        for record in attendance_records:
+            p.drawString(100, y, f"Student: {record.student.name}, Status: {record.status}, Date: {record.date.strftime('%Y-%m-%d')}")
+            y -= 20
+        
+        p.showPage()
+        p.save()
+        return response
 
 class LogoutView(APIView):
     @csrf_exempt

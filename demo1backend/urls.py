@@ -36,11 +36,13 @@ urlpatterns = [
      # URL for loading attendance data (for students and teachers)
     path('attendance/<str:class_code>/', views.AttendanceListView.as_view(), name='attendance_list'),
 
+    path('attendance/<str:class_code>/TeacherFilter', views.TeacherFilterView.as_view(), name='filtered_attendance_list'),
+
     # URL for exporting attendance data as XLSX
-    path('attendance/<str:class_code>/export/xlsx/', views.ExportAttendanceView.as_view(), {'format_type': 'xlsx'}, name='export_attendance_xlsx'),
+    path('attendance/<str:class_code>/export/xlsx/', views.ExportAttendanceXLSX.as_view(), name='export_attendance_xlsx'),
 
     # URL for exporting attendance data as PDF
-    path('attendance/<str:class_code>/export/pdf/', views.ExportAttendanceView.as_view(), {'format_type': 'pdf'}, name='export_attendance_pdf'),
+    path('attendance/<str:class_code>/export/pdf/', views.ExportAttendancePDF.as_view(), name='export_attendance_pdf'),
 
     path('logout/',views.LogoutView.as_view(), name='logout'),
 ]
